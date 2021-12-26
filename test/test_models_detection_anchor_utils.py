@@ -1,7 +1,7 @@
 import pytest
 import torch
 from common_utils import assert_equal
-from torchvision.models.detection.anchor_utils import AnchorGenerator, DefaultBoxGenerator
+from torchvision.models.detection.anchor_utils import AnchorGenerator, DefaultBoxGenerator, RotatedAnchorGenerator
 from torchvision.models.detection.image_list import ImageList
 
 
@@ -22,6 +22,14 @@ class Tester:
         anchor_sizes = ((10,),)
         aspect_ratios = ((1,),)
         anchor_generator = AnchorGenerator(anchor_sizes, aspect_ratios)
+
+        return anchor_generator
+
+    def _init_test_rotated_anchor_generator(self):
+        anchor_sizes = ((10,),)
+        aspect_ratios = ((1,),)
+        angles = ((10,),)
+        anchor_generator = RotatedAnchorGenerator(anchor_sizes, aspect_ratios, angles)
 
         return anchor_generator
 
@@ -70,6 +78,43 @@ class Tester:
         assert len(anchors) == 2
         assert tuple(anchors[0].shape) == (9, 4)
         assert tuple(anchors[1].shape) == (9, 4)
+        assert_equal(anchors[0], anchors_output)
+        assert_equal(anchors[1], anchors_output)
+
+    def test_rotated_anchor_generator(self):
+        images = torch.randn(2, 3, 15, 15)
+        features = self.get_features(images)
+        image_shapes = [i.shape[-2:] for i in images]
+        images = ImageList(images, image_shapes)
+
+        model = self._init_test_rotated_anchor_generator()
+        model.eval()
+        anchors = model(images, features)
+
+        # Estimate the number of target anchors
+        grid_sizes = [f.shape[-2:] for f in features]
+        num_anchors_estimated = 0
+        for sizes, num_anchors_per_loc in zip(grid_sizes, model.num_anchors_per_location()):
+            num_anchors_estimated += sizes[0] * sizes[1] * num_anchors_per_loc
+
+        anchors_output = torch.tensor(
+            [
+                [0.0, 0.0, 5.0, 5.0, 10.0],
+                [5.0, 0.0, 5.0, 5.0, 10.0],
+                [10.0, 0.0, 5.0, 5.0, 10.0],
+                [0.0, 5.0, 5.0, 5.0, 10.0],
+                [5.0, 5.0, 5.0, 5.0, 10.0],
+                [10.0, 5.0, 5.0, 5.0, 10.0],
+                [0.0, 10.0, 5.0, 5.0, 10.0],
+                [5.0, 10.0, 5.0, 5.0, 10.0],
+                [10.0, 10.0, 5.0, 5.0, 10.0],
+            ]
+        )
+
+        assert num_anchors_estimated == 9
+        assert len(anchors) == 2
+        assert tuple(anchors[0].shape) == (9, 5)
+        assert tuple(anchors[1].shape) == (9, 5)
         assert_equal(anchors[0], anchors_output)
         assert_equal(anchors[1], anchors_output)
 
