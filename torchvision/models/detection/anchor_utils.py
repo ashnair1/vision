@@ -3,8 +3,7 @@ from typing import List, Optional
 
 import torch
 from torch import nn, Tensor
-
-from .image_list import ImageList
+from torchvision.models.detection.image_list import ImageList
 
 
 class AnchorGenerator(nn.Module):
@@ -135,6 +134,7 @@ class AnchorGenerator(nn.Module):
         anchors = [torch.cat(anchors_per_image) for anchors_per_image in anchors]
         return anchors
 
+
 class RotatedAnchorGenerator(nn.Module):
     """
     Module that generates rotated anchors for a set of feature maps and
@@ -183,7 +183,8 @@ class RotatedAnchorGenerator(nn.Module):
         self.aspect_ratios = aspect_ratios
         self.angles = angles
         self.cell_anchors = [
-            self.generate_anchors(size, aspect_ratio, angle) for size, aspect_ratio, angle in zip(sizes, aspect_ratios, angles)
+            self.generate_anchors(size, aspect_ratio, angle)
+            for size, aspect_ratio, angle in zip(sizes, aspect_ratios, angles)
         ]
 
     # TODO: https://github.com/pytorch/pytorch/issues/26792
@@ -204,19 +205,13 @@ class RotatedAnchorGenerator(nn.Module):
         h_ratios = torch.sqrt(aspect_ratios)
         w_ratios = 1 / h_ratios
 
-
         ws = (w_ratios[:, None] * scales[None, :]).view(-1)
         hs = (h_ratios[:, None] * scales[None, :]).view(-1)
 
         # anchor boxes centered at (0, 0)
         xcenter, ycenter = torch.zeros(len(ws)), torch.zeros(len(hs))
         base_anchors = torch.stack([xcenter, ycenter, ws, hs], dim=1) / 2
-        final_anchors = [
-            torch.column_stack(
-                (base_anchors, torch.ones(base_anchors.shape[0]) * a)
-            )
-            for a in angles
-        ]
+        final_anchors = [torch.column_stack((base_anchors, torch.ones(base_anchors.shape[0]) * a)) for a in angles]
 
         final_anchors = torch.cat(final_anchors, dim=0)
         return final_anchors.round()
@@ -242,14 +237,14 @@ class RotatedAnchorGenerator(nn.Module):
                 "feature maps passed and the number of sizes / aspect ratios specified."
             )
 
-        #offset = 0.5
+        # offset = 0.5
         for size, stride, base_anchors in zip(grid_sizes, strides, cell_anchors):
             grid_height, grid_width = size
             stride_height, stride_width = stride
             device = base_anchors.device
-            
-            #stride_height = stride_height.item()
-            #stride_width = stride_width.item()
+
+            # stride_height = stride_height.item()
+            # stride_width = stride_width.item()
 
             # For output anchor, compute [x_center, y_center, width, height, angle]
             # TODO: det2 has anchors as float while tv has it as int. Need to see why
